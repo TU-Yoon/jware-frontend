@@ -1,104 +1,236 @@
-<!-- src/views/SignupView.vue -->
 <template>
-  <v-container class="fill-height d-flex align-center justify-center">
-    <v-card width="400" elevation="5" class="pa-5">
-      <v-card-title class="text-center text-h5 font-weight-bold mb-4">
-        Jware 회원가입
-      </v-card-title>
+  <div class="signup-container">
+    <div class="signup-card">
+      <h2 class="title">그룹웨어 회원가입</h2>
 
-      <v-card-text>
-        <v-text-field 
-          v-model="form.username" 
-          label="사용할 아이디" 
-          variant="outlined" 
-          dense
-          class="mb-2"
-        ></v-text-field>
-        
-        <v-text-field 
-          v-model="form.password" 
-          label="비밀번호" 
-          type="password" 
-          variant="outlined" 
-          dense
-          class="mb-2"
-        ></v-text-field>
+      <!-- 에러 메시지 표시 영역 -->
+      <div v-if="errorMessage" class="error-message">
+        {{ errorMessage }}
+      </div>
 
-        <v-text-field 
-          v-model="form.passwordConfirm" 
-          label="비밀번호 확인" 
-          type="password" 
-          variant="outlined" 
-          dense
-          class="mb-2"
-        ></v-text-field>
+      <form @submit.prevent="submitSignup">
+        <!-- 1. ID (사번) -->
+        <div class="form-group">
+          <label for="userId">사번 (ID)</label>
+          <input type="number" id="userId" v-model="user.userId" required placeholder="예: 2026001" />
+        </div>
 
-        <v-text-field 
-          v-model="form.name" 
-          label="이름 (예: 홍길동)" 
-          variant="outlined" 
-          dense
-          @keyup.enter="signup"
-        ></v-text-field>
-        
-        <v-btn color="success" block size="large" class="mt-4" @click="signup">
-          가입하기
-        </v-btn>
-        <v-btn color="grey-darken-1" variant="text" block class="mt-2" @click="goBack">
-          로그인 화면으로 돌아가기
-        </v-btn>
-      </v-card-text>
-    </v-card>
-  </v-container>
+        <!-- 2. 비밀번호 -->
+        <div class="form-group">
+          <label for="password">비밀번호</label>
+          <input type="password" id="password" v-model="user.password" required minlength="4" placeholder="4자 이상 입력" />
+        </div>
+
+        <!-- 3. 비밀번호 확인 -->
+        <div class="form-group">
+          <label for="passwordConfirm">비밀번호 확인</label>
+          <input type="password" id="passwordConfirm" v-model="user.passwordConfirm" required placeholder="비밀번호 다시 입력" />
+        </div>
+
+        <!-- 성과 이름 (가로 배치) -->
+        <div class="form-row">
+          <!-- 4. 성 -->
+          <div class="form-group half">
+            <label for="lastName">성</label>
+            <input type="text" id="lastName" v-model="user.lastName" required placeholder="성" />
+          </div>
+          <!-- 5. 이름 -->
+          <div class="form-group half">
+            <label for="firstName">이름</label>
+            <input type="text" id="firstName" v-model="user.firstName" required placeholder="이름" />
+          </div>
+        </div>
+
+        <!-- 6. 외부 이메일 -->
+        <div class="form-group">
+          <label for="externalEmail">이메일 (외부)</label>
+          <input type="email" id="externalEmail" v-model="user.externalEmail" required placeholder="example@email.com" />
+        </div>
+
+        <!-- 7. 휴대전화번호 -->
+        <div class="form-group">
+          <label for="phoneNumber">휴대전화번호 ('-' 제외)</label>
+          <input type="tel" id="phoneNumber" v-model="user.phoneNumber" required placeholder="01012345678" />
+        </div>
+
+        <!-- 8. 거주 국가 -->
+        <div class="form-group">
+          <label for="country">거주 국가</label>
+          <select id="country" v-model="user.country" required>
+            <option v-for="country in countryList" :key="country" :value="country">
+              {{ country }}
+            </option>
+          </select>
+        </div>
+
+        <!-- 제출 버튼 -->
+        <button type="submit" class="submit-btn" :disabled="isLoading">
+          <span v-if="isLoading">가입 중...</span>
+          <span v-else>가입하기</span>
+        </button>
+      </form>
+    </div>
+  </div>
 </template>
 
 <script setup>
-import { reactive } from 'vue'
-import axios from 'axios'
-import { useRouter } from 'vue-router'
+import { ref, reactive } from 'vue';
+import axios from 'axios';
+import { useRouter } from 'vue-router';
 
-const router = useRouter()
+const router = useRouter();
+const isLoading = ref(false);
+const errorMessage = ref(''); // 커스텀 에러 메시지
 
-// 입력받을 데이터 꾸러미
-const form = reactive({
-  username: '',
+// 폼 데이터 객체
+const user = reactive({
+  userId: '',
   password: '',
   passwordConfirm: '',
-  name: ''
-})
+  lastName: '',
+  firstName: '',
+  externalEmail: '',
+  phoneNumber: '',
+  country: '대한민국', // 기본값 설정
+});
 
-const signup = async () => {
-  // 1. 빈칸 검사
-  if (!form.username || !form.password || !form.name) {
-    alert('모든 항목을 입력해주세요.')
-    return
+// 거주 국가 리스트
+const countryList = ['대한민국', '미국', '일본', '중국', '기타'];
+
+// 회원가입 제출 함수
+const submitSignup = async () => {
+  // 초기화
+  errorMessage.value = '';
+
+  // 1. 비밀번호 일치 확인 (커스텀 유효성 검사)
+  if (user.password !== user.passwordConfirm) {
+    errorMessage.value = '비밀번호가 일치하지 않습니다.';
+    return;
   }
 
-  // 2. 비밀번호 일치 검사
-  if (form.password !== form.passwordConfirm) {
-    alert('비밀번호가 일치하지 않습니다.')
-    return
-  }
-
+  isLoading.value = true;
+  
   try {
-    // 3. 백엔드로 회원가입 요청
-    const response = await axios.post('http://localhost:8080/api/auth/signup', {
-      username: form.username,
-      password: form.password,
-      name: form.name
-    })
-
-    if (response.data === 'success') {
-      alert('회원가입이 완료되었습니다! 로그인해주세요.')
-      router.push('/') // 로그인 화면으로 이동
-    }
+    // 백엔드 API 호출
+    const response = await axios.post('http://localhost:8080/api/auth/signup', user);
+    
+    alert(response.data); // "회원가입이 완료되었습니다." 
+    router.push('/login'); // 성공 시 로그인 페이지로 이동
+    
   } catch (error) {
-    console.error(error)
-    alert('회원가입 중 오류가 발생했습니다. 아이디가 중복되었을 수 있습니다.')
+    if (error.response && error.response.data) {
+      errorMessage.value = error.response.data; // 서버에서 온 에러 메시지 세팅
+    } else {
+      errorMessage.value = '서버와 통신 중 에러가 발생했습니다.';
+    }
+  } finally {
+    isLoading.value = false;
   }
+};
+</script>
+
+<style scoped>
+/* 전체 컨테이너 가운데 정렬 */
+.signup-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  background-color: #f4f5f7;
+  padding: 20px;
 }
 
-const goBack = () => {
-  router.push('/')
+/* 카드 UI 디자인 */
+.signup-card {
+  background: white;
+  padding: 40px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  width: 100%;
+  max-width: 480px;
 }
-</script>
+
+.title {
+  text-align: center;
+  margin-top: 0;
+  margin-bottom: 24px;
+  color: #333;
+}
+
+/* 에러 메시지 스타일 */
+.error-message {
+  background-color: #ffebee;
+  color: #c62828;
+  padding: 12px;
+  border-radius: 4px;
+  margin-bottom: 20px;
+  font-size: 14px;
+  text-align: center;
+}
+
+/* 폼 그룹 및 인풋 디자인 */
+.form-group {
+  margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+}
+
+.form-row {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.form-row .form-group {
+  margin-bottom: 0;
+}
+
+.half {
+  flex: 1;
+}
+
+label {
+  margin-bottom: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #555;
+}
+
+input, select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 14px;
+  transition: border-color 0.2s;
+}
+
+input:focus, select:focus {
+  outline: none;
+  border-color: #0056b3;
+}
+
+/* 버튼 디자인 */
+.submit-btn {
+  width: 100%;
+  padding: 12px;
+  background-color: #0056b3;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  margin-top: 10px;
+  transition: background-color 0.2s;
+}
+
+.submit-btn:hover:not(:disabled) {
+  background-color: #004494;
+}
+
+.submit-btn:disabled {
+  background-color: #999;
+  cursor: not-allowed;
+}
+</style>

@@ -1,59 +1,200 @@
 <template>
-    <v-container>
-        <v-card-title class="text-center text-h1 font-weight-bold mt-5">
-            Jworks Login
-        </v-card-title>
-    </v-container>
-    <v-container class="fill-height d-flex align-center justify-center">
-        <v-card width="400" elevation="5" class="pa-5" rounded="xl">
-            <v-card-title class="text-center text-h5 font-weight-bold mb-4">
-                환영합니다
-            </v-card-title>
+  <div class="login-container">
+    <div class="login-card">
+      <h2 class="title">그룹웨어 로그인</h2>
 
-            <v-card-text>
-                <v-text-field v-model="username" label="아이디" variant="outlined" dense rounded="lg"></v-text-field>
-                <v-text-field v-model="password" label="비밀번호" type="password" variant="outlined" dense rounded="lg" @keyup.enter="login"></v-text-field>
+      <!-- 에러 메시지 표시 영역 -->
+      <div v-if="errorMessage" class="error-message">
+        {{ errorMessage }}
+      </div>
 
-                <v-btn color="primary" block size="large" class="mt-2" rounded="lg" @click="login">로그인</v-btn>
-                <!-- LoginView.vue 의 로그인 버튼 바로 아래에 추가 -->
-                <v-btn color="secondary" variant="outlined" block size="large" class="mt-3" rounded="lg" @click="router.push('/signup')">
-                    회원가입
-                </v-btn>
-            </v-card-text>
-        </v-card>
-    </v-container>
+      <form @submit.prevent="submitLogin">
+        <!-- ID (사번) -->
+        <div class="form-group">
+          <label for="userId">사번 (ID)</label>
+          <input 
+            type="number" 
+            id="userId" 
+            v-model="loginData.userId" 
+            required 
+            placeholder="사번을 입력하세요" 
+          />
+        </div>
+
+        <!-- 비밀번호 -->
+        <div class="form-group">
+          <label for="password">비밀번호</label>
+          <input 
+            type="password" 
+            id="password" 
+            v-model="loginData.password" 
+            required 
+            placeholder="비밀번호를 입력하세요" 
+          />
+        </div>
+
+        <!-- 로그인 버튼 -->
+        <button type="submit" class="submit-btn" :disabled="isLoading">
+          <span v-if="isLoading">로그인 중...</span>
+          <span v-else>로그인</span>
+        </button>
+      </form>
+
+      <div class="signup-link">
+        계정이 없으신가요? <router-link to="/signup">회원가입</router-link>
+      </div>
+    </div>
+  </div>
 </template>
 
 <script setup>
-import { ref } from 'vue'
-import axios from 'axios'
-import { useRouter } from 'vue-router'
+import { ref, reactive } from 'vue';
+import axios from 'axios';
+import { useRouter } from 'vue-router';
 
-const username = ref('')
-const password = ref('')
-const router = useRouter()
+const router = useRouter();
+const isLoading = ref(false);
+const errorMessage = ref('');
 
-const login = async () => {
-    if (!username.value || !password.value) {
-        alert('아이디와 비밀번호를 입력해주세요.')
-        return
+// 로그인 폼 데이터
+const loginData = reactive({
+  userId: '',
+  password: ''
+});
+
+// 로그인 제출 함수
+const submitLogin = async () => {
+  errorMessage.value = '';
+  isLoading.value = true;
+  
+  try {
+    // 백엔드 로그인 API 호출 (아직 백엔드는 안 만들었습니다!)
+    const response = await axios.post('http://localhost:8080/api/auth/login', loginData);
+    
+    // 성공 시 발급받은 JWT 토큰을 브라우저 로컬 스토리지에 저장
+    const token = response.data.token;
+    localStorage.setItem('jwt_token', token);
+    
+    // axios 기본 헤더에 토큰 등록 (이후 모든 요청에 자동으로 토큰 포함)
+    axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    
+    alert('로그인에 성공했습니다.');
+    router.push('/'); // 메인 대시보드로 이동
+    
+  } catch (error) {
+    if (error.response && error.response.status === 401) {
+      errorMessage.value = '사번 또는 비밀번호가 올바르지 않습니다.';
+    } else {
+      errorMessage.value = '서버와 통신 중 에러가 발생했습니다.';
     }
-
-    try {
-        const response = await axios.post('http://localhost:8080/api/auth/login', {
-            username: username.value,
-            password: password.value
-        })
-
-        //로그인 성공 시 백엔드에서 받은 사용자 정보(id, name 등)을 브라우저에 임시 저장
-        localStorage.setItem('user', JSON.stringify(response.data))
-
-        alert(`${response.data.name}님, 환영합니다!`)
-
-        router.push('/main')
-
-    } catch (error) {
-        alert('로그인에 실패했습니다. 아이디와 비밀번호를 확인해주세요.')
-    }
-}
+  } finally {
+    isLoading.value = false;
+  }
+};
 </script>
+
+<style scoped>
+/* 회원가입 화면과 동일한 스타일 적용 */
+.login-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  background-color: #f4f5f7;
+  padding: 20px;
+}
+
+.login-card {
+  background: white;
+  padding: 40px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  width: 100%;
+  max-width: 400px;
+}
+
+.title {
+  text-align: center;
+  margin-top: 0;
+  margin-bottom: 24px;
+  color: #333;
+}
+
+.error-message {
+  background-color: #ffebee;
+  color: #c62828;
+  padding: 12px;
+  border-radius: 4px;
+  margin-bottom: 20px;
+  font-size: 14px;
+  text-align: center;
+}
+
+.form-group {
+  margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+}
+
+label {
+  margin-bottom: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #555;
+}
+
+input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 14px;
+  transition: border-color 0.2s;
+}
+
+input:focus {
+  outline: none;
+  border-color: #0056b3;
+}
+
+.submit-btn {
+  width: 100%;
+  padding: 14px;
+  background-color: #0056b3;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  margin-top: 10px;
+  transition: background-color 0.2s;
+}
+
+.submit-btn:hover:not(:disabled) {
+  background-color: #004494;
+}
+
+.submit-btn:disabled {
+  background-color: #999;
+  cursor: not-allowed;
+}
+
+.signup-link {
+  text-align: center;
+  margin-top: 24px;
+  font-size: 14px;
+  color: #666;
+}
+
+.signup-link a {
+  color: #0056b3;
+  font-weight: bold;
+  text-decoration: none;
+}
+
+.signup-link a:hover {
+  text-decoration: underline;
+}
+</style>

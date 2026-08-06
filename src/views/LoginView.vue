@@ -1,95 +1,73 @@
 <template>
-  <div class="login-container">
-    <div class="login-card">
-      <h2 class="title">그룹웨어 로그인</h2>
+  <v-container class="fill-height d-flex align-center justify-center">
+    <v-card width="400" class="pa-5">
+      <v-card-title class="text-h5 text-center font-weight-bold mb-4">
+        그룹웨어 로그인
+      </v-card-title>
+      <v-card-text>
+        <v-form @submit.prevent="handleLogin">
+          <v-text-field
+            v-model="userId"
+            label="사번 (ID)"
+            type="number"
+            outlined
+            required
+          ></v-text-field>
 
-      <!-- 에러 메시지 표시 영역 -->
-      <div v-if="errorMessage" class="error-message">
-        {{ errorMessage }}
-      </div>
+          <v-text-field
+            v-model="password"
+            label="비밀번호"
+            type="password"
+            outlined
+            required
+          ></v-text-field>
 
-      <form @submit.prevent="submitLogin">
-        <!-- ID (사번) -->
-        <div class="form-group">
-          <label for="userId">사번 (ID)</label>
-          <input 
-            type="number" 
-            id="userId" 
-            v-model="loginData.userId" 
-            required 
-            placeholder="사번을 입력하세요" 
-          />
-        </div>
-
-        <!-- 비밀번호 -->
-        <div class="form-group">
-          <label for="password">비밀번호</label>
-          <input 
-            type="password" 
-            id="password" 
-            v-model="loginData.password" 
-            required 
-            placeholder="비밀번호를 입력하세요" 
-          />
-        </div>
-
-        <!-- 로그인 버튼 -->
-        <button type="submit" class="submit-btn" :disabled="isLoading">
-          <span v-if="isLoading">로그인 중...</span>
-          <span v-else>로그인</span>
-        </button>
-      </form>
-
-      <div class="signup-link">
-        계정이 없으신가요? <router-link to="/signup">회원가입</router-link>
-      </div>
-    </div>
-  </div>
+          <v-btn type="submit" color="primary" block size="large" class="mt-4">
+            로그인
+          </v-btn>
+          
+          <v-btn variant="text" block class="mt-2" @click="goToSignup">
+            회원가입
+          </v-btn>
+        </v-form>
+      </v-card-text>
+    </v-card>
+  </v-container>
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue';
-import axios from 'axios';
+import { ref } from 'vue';
 import { useRouter } from 'vue-router';
+import api from '../api/axios'; // 방금 만든 axios 인스턴스 가져오기
 
 const router = useRouter();
-const isLoading = ref(false);
-const errorMessage = ref('');
+const userId = ref('');
+const password = ref('');
 
-// 로그인 폼 데이터
-const loginData = reactive({
-  userId: '',
-  password: ''
-});
-
-// 로그인 제출 함수
-const submitLogin = async () => {
-  errorMessage.value = '';
-  isLoading.value = true;
-  
+const handleLogin = async () => {
   try {
-    // 백엔드 로그인 API 호출 (아직 백엔드는 안 만들었습니다!)
-    const response = await axios.post('http://localhost:8080/api/auth/login', loginData);
-    
-    // 성공 시 발급받은 JWT 토큰을 브라우저 로컬 스토리지에 저장
+    // 백엔드 로그인 API 호출
+    const response = await api.post('/api/auth/login', {
+      userId: userId.value,
+      password: password.value
+    });
+
+    // 성공 시 발급받은 토큰을 localStorage에 저장
     const token = response.data.token;
-    localStorage.setItem('jwt_token', token);
+    localStorage.setItem('token', token);
+
+    alert('로그인 성공!');
     
-    // axios 기본 헤더에 토큰 등록 (이후 모든 요청에 자동으로 토큰 포함)
-    axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-    
-    alert('로그인에 성공했습니다.');
-    router.push('/'); // 메인 대시보드로 이동
-    
+    // 로그인 성공 후 메인 대시보드로 이동
+    router.push('/'); 
   } catch (error) {
-    if (error.response && error.response.status === 401) {
-      errorMessage.value = '사번 또는 비밀번호가 올바르지 않습니다.';
-    } else {
-      errorMessage.value = '서버와 통신 중 에러가 발생했습니다.';
-    }
-  } finally {
-    isLoading.value = false;
+    console.error(error);
+    alert(error.response?.data || '로그인에 실패했습니다.');
   }
+};
+
+const goToSignup = () => {
+  router.push('/signup');
 };
 </script>
 

@@ -1,296 +1,364 @@
 <template>
-  <!-- 화면 전체를 넓게 쓰기 위해 fluid 적용 -->
-  <v-container fluid class="pa-0 h-100 bg-grey-lighten-4">
-    <v-row no-gutters class="h-100">
-      
-      <!-- ⬅️ 왼쪽 사이드바 (폴더 메뉴) -->
-      <v-col cols="12" sm="3" md="2" class="bg-white border-e h-100 pt-6 px-4" style="min-height: 80vh;">
-        <div class="mb-6">
-          <h2 class="text-h5 font-weight-black mb-2 text-primary" @click="router.push('/main')">Jworks Mail</h2>
-          <span class="text-caption text-grey-darken-1">사번: {{ currentUser.id }}</span>
+  <div class="email-container">
+    <h2>📧 이메일</h2>
+    
+    <div class="email-layout">
+      <!-- 좌측 탭 메뉴 -->
+      <div class="email-sidebar">
+        <button 
+          class="compose-btn" 
+          @click="changeTab('compose')"
+        >
+          메일 쓰기
+        </button>
+        <ul class="tab-list">
+          <li 
+            :class="{ active: currentTab === 'received' }" 
+            @click="changeTab('received')"
+          >
+            받은 메일함
+          </li>
+          <li 
+            :class="{ active: currentTab === 'sent' }" 
+            @click="changeTab('sent')"
+          >
+            보낸 메일함
+          </li>
+        </ul>
+      </div>
+
+      <!-- 우측 콘텐츠 영역 -->
+      <div class="email-content">
+        
+        <!-- 1. 메일 쓰기 폼 -->
+        <div v-if="currentTab === 'compose'" class="compose-section">
+          <h3>새 메일 작성</h3>
+          <div class="form-group">
+            <label>받는 사람 (사번 입력)</label>
+            <input 
+              type="number" 
+              v-model="composeForm.receiverId" 
+              placeholder="받는 사람의 사번(숫자)을 입력하세요" 
+              class="white-input"
+            />
+          </div>
+          <div class="form-group">
+            <label>제목</label>
+            <input 
+              type="text" 
+              v-model="composeForm.title" 
+              placeholder="메일 제목을 입력하세요" 
+              class="white-input"
+            />
+          </div>
+          <div class="form-group">
+            <label>내용</label>
+            <textarea 
+              v-model="composeForm.content" 
+              placeholder="메일 내용을 작성하세요" 
+              class="white-input content-textarea"
+            ></textarea>
+          </div>
+          <div class="actions">
+            <button class="send-btn" @click="sendEmail">보내기</button>
+          </div>
         </div>
 
-        <!-- 새 메일 쓰기 버튼 (다이얼로그 연결) -->
-        <v-dialog v-model="dialog" max-width="600">
-          <template v-slot:activator="{ props }">
-            <v-btn color="primary" block size="large" v-bind="props" class="mb-6 font-weight-bold" elevation="2">
-              <v-icon start>mdi-pencil</v-icon>
-              메일 쓰기
-            </v-btn>
-          </template>
-          <!-- (메일 쓰기 팝업 내용은 기존과 동일) -->
-          <v-card>
-            <v-card-title class="bg-primary text-white pa-4 font-weight-bold">새 메일 작성</v-card-title>
-            <v-card-text class="pa-4 mt-2">
-              <v-text-field v-model="newEmail.receiverId" label="받는 사람 (사번)" type="number" variant="outlined" class="mb-2"></v-text-field>
-              <v-text-field v-model="newEmail.title" label="제목" variant="outlined" class="mb-2"></v-text-field>
-              <v-textarea v-model="newEmail.content" label="내용" variant="outlined" rows="6"></v-textarea>
-            </v-card-text>
-            <v-card-actions class="pa-4 pt-0 justify-end">
-              <v-btn color="grey-darken-1" variant="text" @click="dialog = false">취소</v-btn>
-              <v-btn color="success" variant="elevated" @click="sendEmail">보내기</v-btn>
-            </v-card-actions>
-          </v-card>
-        </v-dialog>
-
-        <!-- 폴더 리스트 -->
-        <v-list nav class="pa-0">
-          <v-list-item 
-            value="received" 
-            :active="currentFolder === 'received'"
-            @click="changeFolder('received')"
-            color="primary"
-            rounded="lg"
-            class="mb-1"
-          >
-            <template v-slot:prepend>
-              <v-icon>mdi-inbox-arrow-down</v-icon>
-            </template>
-            <v-list-item-title class="font-weight-medium">받은 편지함</v-list-item-title>
-            <!-- 안 읽은 메일 개수 뱃지 (옵션) -->
-            <template v-slot:append>
-              <v-badge v-if="unreadCount > 0" :content="unreadCount" color="error" inline></v-badge>
-            </template>
-          </v-list-item>
-
-          <v-list-item 
-            value="sent" 
-            :active="currentFolder === 'sent'"
-            @click="changeFolder('sent')"
-            color="primary"
-            rounded="lg"
-          >
-            <template v-slot:prepend>
-              <v-icon>mdi-send</v-icon>
-            </template>
-            <v-list-item-title class="font-weight-medium">보낸 편지함</v-list-item-title>
-          </v-list-item>
-        </v-list>
-      </v-col>
-
-      <!-- ➡️ 오른쪽 메인 콘텐츠 영역 -->
-      <v-col cols="12" sm="9" md="10" class="pa-6">
-        
-        <!-- 상태 1: 메일 리스트 화면 -->
-        <v-card v-if="!selectedEmail" elevation="0" border rounded="lg" class="h-100 bg-white">
-          <v-card-title class="d-flex align-center pa-4 border-b">
-            <span class="text-h6 font-weight-bold">
-              {{ currentFolder === 'received' ? '받은 편지함' : '보낸 편지함' }}
-            </span>
-            <v-spacer></v-spacer>
-            <v-btn icon="mdi-refresh" variant="text" @click="fetchEmails"></v-btn>
-          </v-card-title>
-
-          <!-- 리스트형 게시판 스타일 -->
-          <v-list lines="one" class="pa-0">
-            <template v-for="(email, index) in currentEmailList" :key="email.id">
-              <v-list-item 
-                @click="viewEmail(email)"
-                class="px-4 py-3 email-row"
-                :class="{ 'bg-blue-grey-lighten-5': !email.read && currentFolder === 'received' }"
+        <!-- 2. 메일 목록 보기 (받은/보낸 메일함) -->
+        <div v-else-if="!selectedEmail" class="list-section">
+          <h3 v-if="currentTab === 'received'">받은 메일함</h3>
+          <h3 v-if="currentTab === 'sent'">보낸 메일함</h3>
+          
+          <table class="email-table">
+            <thead>
+              <tr>
+                <th width="15%">
+                  {{ currentTab === 'received' ? '보낸 사람(사번)' : '받는 사람(사번)' }}
+                </th>
+                <th width="60%">제목</th>
+                <th width="25%">날짜</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr 
+                v-for="email in emails" 
+                :key="email.id" 
+                @click="openEmail(email.id)"
+                :class="{ 'unread': currentTab === 'received' && !email.read }"
               >
-                <div class="d-flex align-center w-100">
-                  <!-- 읽음 상태 아이콘 -->
-                  <v-icon 
-                    v-if="currentFolder === 'received'" 
-                    :color="!email.read ? 'primary' : 'grey-lighten-1'" 
-                    class="mr-4"
-                    size="small"
-                  >
-                    {{ !email.read ? 'mdi-email' : 'mdi-email-open-outline' }}
-                  </v-icon>
-                  <v-icon v-else color="grey-lighten-1" class="mr-4" size="small">mdi-email-send-outline</v-icon>
+                <td>{{ currentTab === 'received' ? email.senderName : email.receiverName }}</td>
+                <td class="email-title">{{ email.title }}</td>
+                <td class="email-date">{{ formatDate(email.createdAt) }}</td>
+              </tr>
+              <tr v-if="emails.length === 0">
+                <td colspan="3" class="empty-msg">메일함이 비어있습니다.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
 
-                  <!-- 발신자/수신자 -->
-                  <div class="text-subtitle-2 mr-6" style="width: 100px;">
-                    {{ currentFolder === 'received' ? `사번: ${email.senderId}` : `사번: ${email.receiverId}` }}
-                  </div>
-                  
-                  <!-- 제목 -->
-                  <div class="text-body-2 text-truncate flex-grow-1" :class="{ 'font-weight-bold': !email.read && currentFolder === 'received' }">
-                    {{ email.title }}
-                  </div>
-                  
-                  <!-- 날짜 -->
-                  <div class="text-caption text-grey ms-4" style="width: 150px; text-align: right;">
-                    {{ formatDate(email.sentAt) }}
-                  </div>
-                </div>
-              </v-list-item>
-              <v-divider v-if="index < currentEmailList.length - 1"></v-divider>
-            </template>
-            
-            <!-- 비어있을 때 -->
-            <div v-if="currentEmailList.length === 0" class="d-flex flex-column align-center justify-center py-12 text-grey">
-              <v-icon size="64" class="mb-4 text-grey-lighten-2">mdi-inbox-outline</v-icon>
-              <p>편지함이 비어있습니다.</p>
+        <!-- 3. 메일 상세 보기 -->
+        <div v-else class="detail-section">
+          <div class="detail-header">
+            <button class="back-btn" @click="selectedEmail = null">⬅ 목록으로</button>
+            <button class="delete-btn" @click="deleteEmail(selectedEmail.id)">삭제</button>
+          </div>
+          <div class="detail-info">
+            <h2>{{ selectedEmail.title }}</h2>
+            <div class="info-row">
+              <span class="label">보낸 사람:</span> {{ selectedEmail.senderId }}
             </div>
-          </v-list>
-        </v-card>
-
-        <!-- 상태 2: 메일 상세 보기 화면 -->
-        <v-card v-else elevation="0" border rounded="lg" class="h-100 bg-white d-flex flex-column">
-          <!-- 상단 툴바 -->
-          <v-toolbar color="white" border="b" density="compact" elevation="0">
-            <v-btn icon="mdi-arrow-left" variant="text" @click="selectedEmail = null"></v-btn>
-            <v-toolbar-title class="text-body-1 ml-0">목록으로</v-toolbar-title>
-            <v-spacer></v-spacer>
-            <v-btn color="error" variant="text" prepend-icon="mdi-delete" @click="deleteEmail(selectedEmail.id)">삭제</v-btn>
-          </v-toolbar>
-
-          <!-- 메일 헤더 -->
-          <div class="pa-6 border-b bg-grey-lighten-5">
-            <h2 class="text-h5 font-weight-bold mb-4">{{ selectedEmail.title }}</h2>
-            <div class="d-flex align-center">
-              <v-avatar color="primary" size="40" class="mr-4">
-                <span class="text-white">{{ currentFolder === 'received' ? selectedEmail.senderId : selectedEmail.receiverId }}</span>
-              </v-avatar>
-              <div>
-                <div class="font-weight-medium">
-                  {{ currentFolder === 'received' ? `보낸 사람: 사번 ${selectedEmail.senderId}` : `받는 사람: 사번 ${selectedEmail.receiverId}` }}
-                </div>
-                <div class="text-caption text-grey">{{ formatDate(selectedEmail.sentAt) }}</div>
-              </div>
+            <div class="info-row">
+              <span class="label">받는 사람:</span> {{ selectedEmail.receiverId }}
+            </div>
+            <div class="info-row">
+              <span class="label">날짜:</span> {{ formatDate(selectedEmail.createdAt) }}
             </div>
           </div>
-
-          <!-- 메일 본문 -->
-          <v-card-text class="pa-6 text-body-1 flex-grow-1" style="white-space: pre-wrap; line-height: 1.8;">
+          <div class="detail-body">
             {{ selectedEmail.content }}
-          </v-card-text>
-        </v-card>
+          </div>
+        </div>
 
-      </v-col>
-    </v-row>
-  </v-container>
+      </div>
+    </div>
+  </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
-import axios from 'axios'
+import { ref, onMounted } from 'vue';
+import api from '../api/axios';
 
-const router = useRouter()
-const currentUser = JSON.parse(localStorage.getItem('user'))
+// 상태 관리
+const currentTab = ref('received'); // 'received', 'sent', 'compose'
+const emails = ref([]);
+const selectedEmail = ref(null);
 
-const dialog = ref(false)
-const currentFolder = ref('received') // 'received' or 'sent'
-const selectedEmail = ref(null) // null이면 리스트, 값이 있으면 상세화면 표시
-
-const receivedEmails = ref([])
-const sentEmails = ref([])
-
-const newEmail = ref({
+const composeForm = ref({
   receiverId: '',
   title: '',
   content: ''
-})
+});
 
-// 현재 선택된 폴더에 맞는 배열을 반환하는 Computed 속성
-const currentEmailList = computed(() => {
-  return currentFolder.value === 'received' ? receivedEmails.value : sentEmails.value
-})
-
-// 안 읽은 메일 개수 계산
-const unreadCount = computed(() => {
-  return receivedEmails.value.filter(email => !email.read).length
-})
-
-onMounted(() => {
-  if (!currentUser) {
-    alert('로그인이 필요합니다.')
-    router.push('/')
-    return
-  }
-  fetchEmails()
-})
-
-const fetchEmails = async () => {
-  try {
-    const [receivedRes, sentRes] = await Promise.all([
-      axios.get(`http://localhost:8080/api/emails/received/${currentUser.id}`),
-      axios.get(`http://localhost:8080/api/emails/sent/${currentUser.id}`)
-    ])
-    receivedEmails.value = receivedRes.data
-    sentEmails.value = sentRes.data
-  } catch (error) {
-    console.error('메일 목록을 불러오는데 실패했습니다:', error)
-  }
-}
-
-const sendEmail = async () => {
-  if (!newEmail.value.receiverId || !newEmail.value.title.trim()) {
-    alert('받는 사람 번호와 제목을 입력해주세요.')
-    return
-  }
-  
-  try {
-    await axios.post('http://localhost:8080/api/emails', {
-      senderId: currentUser.id,
-      receiverId: Number(newEmail.value.receiverId),
-      title: newEmail.value.title,
-      content: newEmail.value.content
-    })
-    
-    newEmail.value = { receiverId: '', title: '', content: '' }
-    dialog.value = false
-    alert('메일을 성공적으로 보냈습니다!')
-    
-    fetchEmails() 
-    currentFolder.value = 'sent' // 보내고 나면 보낸 편지함으로 자동 이동
-    selectedEmail.value = null
-  } catch (error) {
-    console.error('메일 전송에 실패했습니다:', error)
-  }
-}
-
-// 리스트에서 메일 클릭 시 실행되는 함수
-const viewEmail = async (email) => {
-  selectedEmail.value = email // 상세 화면으로 전환
-  
-  // 받은 편지함이고, 아직 안 읽은 메일이라면 읽음 처리 API 호출
-  if (currentFolder.value === 'received' && !email.read) {
-    try {
-      await axios.put(`http://localhost:8080/api/emails/${email.id}/read`)
-      email.read = true // 즉시 상태 업데이트
-    } catch (error) {
-      console.error('읽음 처리 실패:', error)
-    }
-  }
-}
-
-const deleteEmail = async (id) => {
-  if (!confirm('정말 삭제하시겠습니까?')) return
-  
-  try {
-    await axios.delete(`http://localhost:8080/api/emails/${id}`)
-    selectedEmail.value = null // 삭제 후 리스트 화면으로 복귀
-    fetchEmails() 
-  } catch (error) {
-    console.error('메일 삭제에 실패했습니다:', error)
-  }
-}
-
-const changeFolder = (folderName) => {
-  currentFolder.value = folderName
-  selectedEmail.value = null // 폴더를 바꾸면 무조건 리스트 화면으로 돌아감
-}
-
+// 날짜 포맷 함수
 const formatDate = (dateString) => {
-  if (!dateString) return ''
-  const date = new Date(dateString)
-  // 기업용 툴 스타일 날짜 포맷 (예: 2026-08-05 14:30)
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
-}
+  if (!dateString) return '';
+  const date = new Date(dateString);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+};
+
+// 탭 변경
+const changeTab = (tab) => {
+  currentTab.value = tab;
+  selectedEmail.value = null; // 탭 이동 시 상세 보기 닫기
+  if (tab === 'received') fetchReceivedEmails();
+  else if (tab === 'sent') fetchSentEmails();
+};
+
+// 1. 받은 메일함 조회
+const fetchReceivedEmails = async () => {
+  try {
+    const res = await api.get('/api/emails/received');
+    emails.value = res.data;
+  } catch (error) {
+    alert('받은 메일함을 불러오지 못했습니다.');
+  }
+};
+
+// 2. 보낸 메일함 조회
+const fetchSentEmails = async () => {
+  try {
+    const res = await api.get('/api/emails/sent');
+    emails.value = res.data;
+  } catch (error) {
+    alert('보낸 메일함을 불러오지 못했습니다.');
+  }
+};
+
+// 3. 메일 상세 조회 (클릭 시)
+const openEmail = async (id) => {
+  try {
+    const res = await api.get(`/api/emails/${id}`);
+    selectedEmail.value = res.data;
+    
+    // 만약 받은 메일함에서 열었다면, 읽음 처리(isRead)가 되었을 테니 목록 데이터도 갱신해줍니다.
+    if (currentTab.value === 'received') {
+      const emailInList = emails.value.find(e => e.id === id);
+      if (emailInList) emailInList.read = true;
+    }
+  } catch (error) {
+    alert('메일 상세 정보를 불러오지 못했습니다.');
+  }
+};
+
+// 4. 메일 전송
+const sendEmail = async () => {
+  if (!composeForm.value.receiverId || !composeForm.value.title) {
+    alert('받는 사람 사번과 제목을 입력해주세요.');
+    return;
+  }
+  
+  try {
+    await api.post('/api/emails', {
+      receiverId: composeForm.value.receiverId,
+      title: composeForm.value.title,
+      content: composeForm.value.content
+    });
+    
+    alert('메일이 전송되었습니다!');
+    // 폼 초기화 후 보낸 메일함으로 이동
+    composeForm.value = { receiverId: '', title: '', content: '' };
+    changeTab('sent');
+  } catch (error) {
+    alert('메일 전송에 실패했습니다. (받는 사람 사번을 확인해주세요.)');
+  }
+};
+
+// 5. 메일 삭제
+const deleteEmail = async (id) => {
+  if (!confirm('이 메일을 삭제하시겠습니까?')) return;
+  
+  try {
+    await api.delete(`/api/emails/${id}`);
+    alert('삭제되었습니다.');
+    selectedEmail.value = null; // 상세 보기 닫기
+    // 현재 탭 새로고침
+    if (currentTab.value === 'received') fetchReceivedEmails();
+    else fetchSentEmails();
+  } catch (error) {
+    alert('삭제 중 오류가 발생했습니다.');
+  }
+};
+
+// 초기 렌더링 시 받은 메일함 로드
+onMounted(() => {
+  fetchReceivedEmails();
+});
 </script>
 
 <style scoped>
-/* 마우스를 올렸을 때 클릭 가능한 느낌을 주는 효과 */
-.email-row {
+.email-container {
+  padding: 40px;
+  max-width: 1200px;
+  margin: 0 auto;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+h2 { margin-bottom: 24px; color: #333; }
+h3 { margin-bottom: 20px; color: #333; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+
+.email-layout {
+  display: flex;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+  height: 600px;
+  overflow: hidden;
+}
+
+/* 좌측 사이드바 */
+.email-sidebar {
+  width: 250px;
+  background-color: #f8f9fa;
+  border-right: 1px solid #e0e0e0;
+  padding: 20px 0;
+}
+
+.compose-btn {
+  width: 80%;
+  margin: 0 auto 20px;
+  display: block;
+  padding: 12px;
+  background-color: #0056b3;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-weight: bold;
   cursor: pointer;
-  transition: background-color 0.2s;
 }
-.email-row:hover {
-  background-color: #f5f5f5;
+.compose-btn:hover { background-color: #004494; }
+
+.tab-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
 }
+.tab-list li {
+  padding: 15px 25px;
+  cursor: pointer;
+  color: #555;
+  font-weight: 500;
+}
+.tab-list li:hover { background-color: #f1f3f5; }
+.tab-list li.active {
+  background-color: #e3f2fd;
+  color: #0056b3;
+  border-left: 4px solid #0056b3;
+  font-weight: bold;
+}
+
+/* 우측 콘텐츠 영역 */
+.email-content {
+  flex: 1;
+  padding: 30px;
+  overflow-y: auto;
+}
+
+/* 공통: 흰색 배경 강제 적용 (다크모드 간섭 방지) */
+.white-input {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background-color: white;
+  color: #333;
+  box-sizing: border-box;
+  font-size: 14px;
+}
+
+/* 폼 요소 */
+.form-group { margin-bottom: 20px; }
+.form-group label { display: block; font-weight: bold; margin-bottom: 8px; color: #555; }
+.content-textarea { height: 250px; resize: none; line-height: 1.5; }
+
+.send-btn {
+  padding: 12px 30px;
+  background-color: #0056b3;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-weight: bold;
+  cursor: pointer;
+}
+.send-btn:hover { background-color: #004494; }
+
+/* 테이블 (메일 목록) */
+.email-table { width: 100%; border-collapse: collapse; }
+.email-table th, .email-table td {
+  padding: 15px 10px;
+  border-bottom: 1px solid #eee;
+  text-align: left;
+}
+.email-table th { background-color: #fafafa; color: #666; font-weight: bold; }
+.email-table tbody tr { cursor: pointer; }
+.email-table tbody tr:hover { background-color: #f9f9f9; }
+.email-table tbody tr.unread { font-weight: bold; background-color: #f0f7ff; }
+
+.email-date { color: #888; font-size: 13px; }
+.empty-msg { text-align: center; padding: 40px !important; color: #999; }
+
+/* 메일 상세 보기 */
+.detail-header { display: flex; justify-content: space-between; margin-bottom: 20px; }
+.back-btn { background: none; border: none; color: #0056b3; cursor: pointer; font-weight: bold; font-size: 16px; }
+.delete-btn { padding: 8px 16px; border: 1px solid #d32f2f; color: #d32f2f; background: white; border-radius: 4px; cursor: pointer; }
+.delete-btn:hover { background: #ffebee; }
+
+.detail-info { background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
+.detail-info h2 { margin-top: 0; margin-bottom: 15px; }
+.info-row { margin-bottom: 8px; color: #333; }
+.info-row .label { font-weight: bold; display: inline-block; width: 80px; color: #666; }
+
+.detail-body { padding: 20px 10px; line-height: 1.6; color: #444; white-space: pre-wrap; }
 </style>

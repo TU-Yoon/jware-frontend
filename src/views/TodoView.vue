@@ -152,13 +152,16 @@ h2 {
   border: 1px solid #ccc;
   border-radius: 4px;
   font-size: 15px;
+  background-color: white;
+  color: #333;
 }
 
 .input-date {
   padding: 12px;
   border: 1px solid #ccc;
   border-radius: 4px;
-  color: #555;
+  background-color: white;
+  color: #333;
 }
 
 .add-btn {

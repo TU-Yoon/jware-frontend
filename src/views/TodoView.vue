@@ -1,174 +1,263 @@
-<!-- src/views/TodoView.vue -->
 <template>
-  <v-container max-width="800">
-    <div class="d-flex justify-space-between align-center mb-6 mt-4">
-      <h1 class="text-h4 font-weight-bold">할 일 목록</h1>
+  <div class="todo-container">
+    <h2>✅ 할 일 관리</h2>
+    
+    <!-- 할 일 추가 폼 -->
+    <div class="add-todo-form">
+      <input 
+        type="text" 
+        v-model="newTitle" 
+        placeholder="새로운 할 일을 입력하세요" 
+        @keyup.enter="addTodo"
+        class="input-title"
+      />
+      <input 
+        type="date" 
+        v-model="newDeadline" 
+        class="input-date"
+      />
+      <button @click="addTodo" class="add-btn">추가</button>
     </div>
 
-    <!-- 할 일 추가 팝업(Dialog) 영역 -->
-    <div class="mb-6 d-flex justify-end">
-      <v-dialog v-model="dialog" max-width="500">
-        <template v-slot:activator="{ props }">
-          <v-btn color="primary" size="large" v-bind="props" prepend-icon="mdi-plus">
-            새로운 할 일 추가
-          </v-btn>
-        </template>
-
-        <v-card>
-          <v-card-title class="text-h6 font-weight-bold pa-4 bg-primary text-white">
-            새 할 일 등록
-          </v-card-title>
-          <v-card-text class="pa-4 mt-2">
-            <v-text-field 
-              v-model="newTask.title" 
-              label="할 일 제목" 
-              variant="outlined" 
-              class="mb-2"
-            ></v-text-field>
-            <v-text-field 
-              v-model="newTask.deadline" 
-              label="기한 (마감일)" 
-              type="date" 
-              variant="outlined"
-            ></v-text-field>
-          </v-card-text>
-          <v-card-actions class="pa-4 pt-0 justify-end">
-            <v-btn color="grey-darken-1" variant="text" @click="dialog = false">취소</v-btn>
-            <v-btn color="success" variant="elevated" @click="addTodo">저장하기</v-btn>
-          </v-card-actions>
-        </v-card>
-      </v-dialog>
+    <!-- 할 일 목록 -->
+    <div class="todo-list">
+      <div 
+        v-for="todo in todos" 
+        :key="todo.id" 
+        class="todo-item"
+        :class="{ 'completed': todo.completed }"
+      >
+        <div class="todo-content">
+          <!-- 완료 체크박스 -->
+          <input 
+            type="checkbox" 
+            :checked="todo.completed" 
+            @change="toggleComplete(todo)"
+            class="checkbox"
+          />
+          
+          <!-- 할 일 내용 -->
+          <span class="title">{{ todo.title }}</span>
+          
+          <!-- 마감일 표시 (데이터가 있을 때만) -->
+          <span class="deadline" v-if="todo.deadline">
+            마감: {{ todo.deadline }}
+          </span>
+        </div>
+        
+        <!-- 삭제 버튼 -->
+        <button @click="deleteTodo(todo.id)" class="delete-btn">삭제</button>
+      </div>
+      
+      <!-- 목록이 비어있을 때 표시 -->
+      <div v-if="todos.length === 0" class="empty-msg">
+        등록된 할 일이 없습니다. 오늘 할 일을 추가해 보세요!
+      </div>
     </div>
-
-    <!-- 할 일 목록 출력 영역 -->
-    <v-card elevation="2">
-      <v-list lines="one">
-        <v-list-item 
-          v-for="task in tasks" 
-          :key="task.id" 
-          :class="{ 'bg-grey-lighten-4': task.completed }"
-        >
-          <template v-slot:prepend>
-            <!-- 완료 상태 변경 체크박스 -->
-            <v-checkbox-btn 
-              v-model="task.completed" 
-              color="primary"
-              @change="updateTaskStatus(task)"
-            ></v-checkbox-btn>
-          </template>
-
-          <!-- 🚨 v-list-item-title 로 수정완료 -->
-          <v-list-item-title 
-            :class="{ 'text-decoration-line-through text-grey': task.completed }"
-            class="text-body-1 font-weight-medium"
-          >
-            {{ task.title }}
-          </v-list-item-title>
-
-          <template v-slot:append>
-            <v-chip size="small" class="mr-4 text-grey">
-              {{ task.deadline }} 까지
-            </v-chip>
-            <!-- 삭제 버튼 -->
-            <v-btn icon="mdi-delete" variant="text" color="error" size="small" @click="deleteTask(task.id)"></v-btn>
-          </template>
-        </v-list-item>
-
-        <v-list-item v-if="tasks.length === 0">
-          <v-list-item-title class="text-center text-grey py-4">
-            모든 할 일을 마쳤습니다! 🎉
-          </v-list-item-title>
-        </v-list-item>
-      </v-list>
-    </v-card>
-  </v-container>
+  </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
-import axios from 'axios'
+import { ref, onMounted } from 'vue';
+import api from '../api/axios'; // 토큰이 자동 주입되는 axios 인스턴스
 
-const router = useRouter()
-const tasks = ref([])
+const todos = ref([]);
+const newTitle = ref('');
+const newDeadline = ref('');
 
-// 팝업 상태 및 새로운 할 일 데이터 객체
-const dialog = ref(false)
-const newTask = ref({
-  title: '',
-  deadline: ''
-})
-
-const currentUser = JSON.parse(localStorage.getItem('user'))
-
-onMounted(() => {
-  if (!currentUser) {
-    alert('로그인이 필요합니다.')
-    router.push('/')
-    return
-  }
-  fetchTodos()
-})
-
-// 1. 목록 불러오기
+// 1. 할 일 목록 불러오기 (GET)
 const fetchTodos = async () => {
   try {
-    const response = await axios.get(`http://localhost:8080/api/todos/user/${currentUser.id}`)
-    tasks.value = response.data
+    const response = await api.get('/api/todos');
+    todos.value = response.data;
   } catch (error) {
-    console.error('할 일 목록을 불러오는데 실패했습니다:', error)
+    console.error(error);
+    alert('할 일 목록을 불러오지 못했습니다.');
   }
-}
+};
 
-// 2. 새로운 할 일 추가
+// 2. 할 일 추가하기 (POST)
 const addTodo = async () => {
-  if (!newTask.value.title.trim()) {
-    alert('할 일 제목을 입력해주세요.')
-    return
+  if (!newTitle.value.trim()) {
+    alert('할 일 내용을 입력해주세요.');
+    return;
   }
   try {
-    await axios.post('http://localhost:8080/api/todos', {
-      userId: currentUser.id,
-      title: newTask.value.title,
-      deadline: newTask.value.deadline || new Date().toISOString().split('T')[0],
-      completed: false
-    })
-    
-    newTask.value.title = ''
-    newTask.value.deadline = ''
-    dialog.value = false
-    
-    fetchTodos() // 저장 후 목록 갱신
+    await api.post('/api/todos', {
+      title: newTitle.value,
+      deadline: newDeadline.value || null // 날짜 지정 안 했으면 null 전송
+    });
+    // 추가 성공 후 입력창 초기화 및 목록 새로고침
+    newTitle.value = '';
+    newDeadline.value = '';
+    fetchTodos(); 
   } catch (error) {
-    console.error('할 일 추가에 실패했습니다:', error)
+    alert('할 일 추가 중 오류가 발생했습니다.');
   }
-}
+};
 
-// 3. 상태 변경 (체크박스)
-const updateTaskStatus = async (task) => {
+// 3. 완료 상태 변경 (PUT)
+const toggleComplete = async (todo) => {
   try {
-    await axios.put(`http://localhost:8080/api/todos/${task.id}`, {
-      completed: task.completed
-    })
+    await api.put(`/api/todos/${todo.id}`, {
+      ...todo,
+      completed: !todo.completed // 현재 상태의 반대값으로 수정
+    });
+    fetchTodos(); // 성공 후 목록 새로고침 (정렬 순서 업데이트를 위함)
   } catch (error) {
-    console.error('상태 변경에 실패했습니다:', error)
-    task.completed = !task.completed
+    alert('상태 변경 중 오류가 발생했습니다.');
   }
-}
+};
 
-// 4. 할 일 삭제 (DB 연동 완비)
-const deleteTask = async (id) => {
-  if (!confirm('정말 삭제하시겠습니까?')) return
-
+// 4. 할 일 삭제 (DELETE)
+const deleteTodo = async (id) => {
+  if (!confirm('정말 삭제하시겠습니까?')) return;
+  
   try {
-    await axios.delete(`http://localhost:8080/api/todos/${id}`)
-    fetchTodos() // 삭제 성공 시 목록 다시 불러오기
+    await api.delete(`/api/todos/${id}`);
+    fetchTodos(); // 삭제 성공 후 목록 새로고침
   } catch (error) {
-    console.error('할 일 삭제에 실패했습니다:', error)
+    alert('삭제 중 오류가 발생했습니다.');
   }
-}
+};
 
-const goBack = () => {
-  router.push('/memo')
-}
+// 화면이 처음 렌더링될 때 목록 불러오기 실행
+onMounted(() => {
+  fetchTodos();
+});
 </script>
+
+<style scoped>
+.todo-container {
+  padding: 40px;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+h2 {
+  color: #333;
+  margin-bottom: 24px;
+}
+
+/* 추가 폼 스타일 */
+.add-todo-form {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 30px;
+}
+
+.input-title {
+  flex: 1;
+  padding: 12px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 15px;
+}
+
+.input-date {
+  padding: 12px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  color: #555;
+}
+
+.add-btn {
+  padding: 0 24px;
+  background-color: #0056b3;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: bold;
+  white-space: nowrap;
+}
+.add-btn:hover {
+  background-color: #004494;
+}
+
+/* 목록 스타일 */
+.todo-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.todo-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: white;
+  padding: 16px 20px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  transition: all 0.2s;
+}
+
+.todo-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+}
+
+.checkbox {
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+}
+
+.title {
+  font-size: 16px;
+  color: #333;
+}
+
+.deadline {
+  font-size: 13px;
+  color: #e53935;
+  background-color: #ffebee;
+  padding: 4px 8px;
+  border-radius: 12px;
+  margin-left: auto; /* 마감일을 오른쪽으로 밀어줌 */
+  margin-right: 16px;
+}
+
+/* 완료된 항목 스타일 */
+.todo-item.completed {
+  opacity: 0.6;
+  background-color: #f9f9f9;
+}
+
+.todo-item.completed .title {
+  text-decoration: line-through;
+  color: #888;
+}
+
+.todo-item.completed .deadline {
+  color: #888;
+  background-color: #eee;
+}
+
+/* 삭제 버튼 */
+.delete-btn {
+  padding: 8px 16px;
+  background-color: #fff;
+  color: #e53935;
+  border: 1px solid #e53935;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.delete-btn:hover {
+  background-color: #e53935;
+  color: white;
+}
+
+.empty-msg {
+  text-align: center;
+  padding: 40px;
+  color: #888;
+  background: white;
+  border-radius: 8px;
+}
+</style>

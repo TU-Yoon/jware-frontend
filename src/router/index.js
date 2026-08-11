@@ -7,6 +7,7 @@ import MainView from '../views/MainView.vue'
 import SignupView from '../views/SignupView.vue'
 import EmailView from '@/views/EmailView.vue'
 import HomeView from '@/views/HomeView.vue'
+import ProfileView from '@/views/ProfileView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -45,6 +46,11 @@ const router = createRouter({
       path: '/email',
       name: 'email',
       component: EmailView
+    },
+    {
+      path: '/profile',
+      name: 'profile',
+      component: ProfileView
     }
   ]
 })

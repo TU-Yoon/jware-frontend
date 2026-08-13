@@ -1,178 +1,257 @@
 <template>
-  <v-container class="fill-height d-flex align-center justify-center">
-    <v-card width="400" class="pa-5">
-      <v-card-title class="text-h5 text-center font-weight-bold mb-4">
-        그룹웨어 로그인
-      </v-card-title>
-      <v-card-text>
-        <v-form @submit.prevent="handleLogin">
-          <v-text-field
-            v-model="userId"
-            label="사번 (ID)"
-            type="number"
-            outlined
-            required
-          ></v-text-field>
+  <div class="login-container">
+    <div class="login-card">
+      
+      <!-- 상단 로고 및 타이틀 영역 -->
+      <div class="login-header">
+        <h1 class="logo">
+          <span class="logo-icon">🏢</span> JWorks
+        </h1>
+        <h2>로그인</h2>
+        <p>JWorks 그룹웨어에 오신 것을 환영합니다.</p>
+      </div>
 
-          <v-text-field
-            v-model="password"
-            label="비밀번호"
-            type="password"
-            outlined
-            required
-          ></v-text-field>
+      <!-- 로그인 폼 영역 -->
+      <form @submit.prevent="handleLogin" class="login-form">
+        <div class="input-group">
+          <input 
+            type="text" 
+            v-model="userId" 
+            id="userId" 
+            required 
+            placeholder="사번 (ID)을 입력하세요" 
+            class="clean-input"
+          />
+        </div>
+        
+        <div class="input-group">
+          <input 
+            type="password" 
+            v-model="password" 
+            id="password" 
+            required 
+            placeholder="비밀번호를 입력하세요" 
+            class="clean-input"
+          />
+        </div>
 
-          <v-btn type="submit" color="primary" block size="large" class="mt-4">
-            로그인
-          </v-btn>
-          
-          <v-btn variant="text" block class="mt-2" @click="goToSignup">
-            회원가입
-          </v-btn>
-        </v-form>
-      </v-card-text>
-    </v-card>
-  </v-container>
+        <div class="form-options">
+          <label class="remember-me">
+            <input type="checkbox" /> 아이디 저장
+          </label>
+        </div>
+
+        <button type="submit" class="login-btn">로그인</button>
+      </form>
+
+      <!-- 하단 링크 영역 -->
+      <div class="login-footer">
+        <a href="#" class="footer-link">사번 찾기</a>
+        <span class="divider">|</span>
+        <a href="#" class="footer-link">비밀번호 찾기</a>
+        <span class="divider">|</span>
+        <router-link to="/signup" class="footer-link highlight">회원가입</router-link>
+      </div>
+      
+    </div>
+  </div>
 </template>
 
 <script setup>
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
-import api from '../api/axios'; // 방금 만든 axios 인스턴스 가져오기
+import api from '../api/axios'; // 실제 설정된 axios 경로에 맞게 수정해주세요
 
-const router = useRouter();
 const userId = ref('');
 const password = ref('');
+const router = useRouter();
 
 const handleLogin = async () => {
   try {
-    // 백엔드 로그인 API 호출
-    const response = await api.post('/api/auth/login', {
-      userId: userId.value,
+    const res = await api.post('/api/users/login', {
+      id: userId.value,
       password: password.value
     });
-
-    // 성공 시 발급받은 토큰을 localStorage에 저장
-    const token = response.data.token;
-    localStorage.setItem('token', token);
-
-    alert('로그인 성공!');
     
-    // 로그인 성공 후 메인 대시보드로 이동
-    router.push('/'); 
+    // 토큰 저장 (구현 방식에 따라 다를 수 있습니다)
+    localStorage.setItem('token', res.data.token);
+    alert('로그인 성공!');
+    router.push('/');
   } catch (error) {
-    console.error(error);
-    alert(error.response?.data || '로그인에 실패했습니다.');
+    alert('사번 또는 비밀번호가 일치하지 않습니다.');
   }
-};
-
-const goToSignup = () => {
-  router.push('/signup');
 };
 </script>
 
 <style scoped>
-/* 회원가입 화면과 동일한 스타일 적용 */
+/* =========================================
+   구글/네이버 스타일 모던 로그인 레이아웃
+========================================= */
+
+/* 화면 전체를 채우는 배경 */
 .login-container {
   display: flex;
   justify-content: center;
   align-items: center;
   min-height: 100vh;
-  background-color: #f4f5f7;
-  padding: 20px;
+  background-color: #f0f2f5; /* 눈이 편안한 밝은 회색 배경 */
+  font-family: 'Noto Sans KR', sans-serif;
 }
 
+/* 중앙 로그인 카드 */
 .login-card {
-  background: white;
-  padding: 40px;
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   width: 100%;
-  max-width: 400px;
+  max-width: 420px;
+  background-color: #ffffff;
+  padding: 48px 40px;
+  border-radius: 12px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08); /* 부드럽고 넓은 그림자 */
+  box-sizing: border-box;
 }
 
-.title {
+/* 헤더 스타일 */
+.login-header {
   text-align: center;
-  margin-top: 0;
-  margin-bottom: 24px;
-  color: #333;
+  margin-bottom: 32px;
 }
 
-.error-message {
-  background-color: #ffebee;
-  color: #c62828;
-  padding: 12px;
-  border-radius: 4px;
-  margin-bottom: 20px;
+.logo {
+  font-size: 28px;
+  font-weight: 800;
+  color: #1a73e8; /* 구글 스타일의 신뢰감 있는 블루 */
+  margin: 0 0 16px 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  letter-spacing: -0.5px;
+}
+
+.logo-icon {
+  font-size: 32px;
+}
+
+.login-header h2 {
+  font-size: 24px;
+  color: #202124;
+  margin: 0 0 8px 0;
+  font-weight: 500;
+}
+
+.login-header p {
   font-size: 14px;
-  text-align: center;
+  color: #5f6368;
+  margin: 0;
 }
 
-.form-group {
-  margin-bottom: 20px;
+/* 폼 요소 스타일 */
+.login-form {
   display: flex;
   flex-direction: column;
+  gap: 16px;
 }
 
-label {
-  margin-bottom: 6px;
-  font-size: 14px;
-  font-weight: 600;
-  color: #555;
-}
-
-input {
+.input-group {
+  position: relative;
   width: 100%;
+}
+
+.clean-input {
+  width: 100%;
+  padding: 14px 16px;
+  font-size: 15px;
+  color: #202124;
+  background-color: #fff;
+  border: 1px solid #dadce0;
+  border-radius: 8px;
   box-sizing: border-box;
-  padding: 12px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  font-size: 14px;
-  transition: border-color 0.2s;
-}
-
-input:focus {
+  transition: border-color 0.2s, box-shadow 0.2s;
   outline: none;
-  border-color: #0056b3;
 }
 
-.submit-btn {
+.clean-input::placeholder {
+  color: #9aa0a6;
+}
+
+/* 입력창 포커스 효과 (네이버/구글 스타일) */
+.clean-input:focus {
+  border-color: #1a73e8;
+  box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.2);
+}
+
+.form-options {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: -4px;
+  margin-bottom: 8px;
+}
+
+.remember-me {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #5f6368;
+  cursor: pointer;
+}
+
+/* 로그인 버튼 */
+.login-btn {
   width: 100%;
   padding: 14px;
-  background-color: #0056b3;
-  color: white;
+  background-color: #1a73e8;
+  color: #ffffff;
   border: none;
-  border-radius: 4px;
+  border-radius: 8px;
   font-size: 16px;
   font-weight: bold;
   cursor: pointer;
-  margin-top: 10px;
-  transition: background-color 0.2s;
+  transition: background-color 0.2s, box-shadow 0.2s;
 }
 
-.submit-btn:hover:not(:disabled) {
-  background-color: #004494;
+.login-btn:hover {
+  background-color: #1557b0;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.15);
 }
 
-.submit-btn:disabled {
-  background-color: #999;
-  cursor: not-allowed;
+.login-btn:active {
+  background-color: #174ea6;
 }
 
-.signup-link {
+/* 하단 링크 영역 */
+.login-footer {
+  margin-top: 32px;
   text-align: center;
-  margin-top: 24px;
-  font-size: 14px;
-  color: #666;
+  font-size: 13px;
+  color: #5f6368;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
 }
 
-.signup-link a {
-  color: #0056b3;
-  font-weight: bold;
+.footer-link {
+  color: #5f6368;
   text-decoration: none;
+  transition: color 0.2s;
 }
 
-.signup-link a:hover {
+.footer-link:hover {
+  color: #202124;
   text-decoration: underline;
+}
+
+.footer-link.highlight {
+  color: #1a73e8;
+  font-weight: bold;
+}
+
+.footer-link.highlight:hover {
+  color: #1557b0;
+}
+
+.divider {
+  color: #dadce0;
 }
 </style>
